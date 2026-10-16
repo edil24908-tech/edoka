@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NomadAI</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  html,body{height:100%;margin:0;background:#0a0b0e;font-family:'Sora',system-ui,sans-serif;color:#fff;-webkit-tap-highlight-color:transparent}
+  .leaflet-container{background:#121418;font-family:inherit}
+  .leaflet-container img{max-width:none!important}
+  .leaflet-control-attribution{background:rgba(18,20,24,.7)!important;color:#7b8190!important;font-size:9px}
+  .leaflet-control-attribution a{color:#9aa0ad!important}
+  .pin{width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;background:#1E2028;border:2px solid #FACC15;color:#FACC15;box-shadow:0 6px 16px rgba(0,0,0,.5)}
+  .pin.on{background:#FACC15;color:#121418}
+  select,textarea,input{outline:none}
+  select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%23FACC15' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+  select option{background:#1E2028}
+  input[type=range]{accent-color:#FACC15}
+  .noscroll::-webkit-scrollbar{display:none}.noscroll{scrollbar-width:none}
+  :focus-visible{outline:2px solid #FACC15;outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body class="flex items-center justify-center">
+<div id="app" class="relative w-full max-w-md h-[100dvh] md:h-[860px] md:max-h-[96dvh] md:rounded-[2.5rem] md:border md:border-white/10 overflow-hidden bg-[#121418] shadow-2xl">
+
+  <!-- TRANSLATE -->
+  <section id="s-translate" class="screen absolute inset-0 overflow-y-auto px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-28">
+    <div class="hdr"></div>
+    <div class="card rounded-3xl bg-[#1E2028] p-4 mt-2">
+      <div class="flex items-center gap-2">
+        <select id="tr-from" class="flex-1 min-w-0 rounded-2xl bg-[#262932] pl-4 pr-9 py-3 text-sm font-semibold"></select>
+        <button id="tr-swap" aria-label="Swap languages" class="shrink-0 w-10 h-10 rounded-full bg-[#FACC15] text-[#121418] flex items-center justify-center active:scale-90 transition">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg></button>
+        <select id="tr-to" class="flex-1 min-w-0 rounded-2xl bg-[#262932] pl-4 pr-9 py-3 text-sm font-semibold"></select>
+      </div>
+      <textarea id="tr-in" rows="4" placeholder="Type something to translate…" class="mt-3 w-full resize-none rounded-2xl bg-[#262932] p-4 text-base placeholder:text-white/30"></textarea>
+      <div class="flex gap-2 mt-3 overflow-x-auto noscroll" id="tr-chips"></div>
+      <button id="tr-go" class="mt-4 w-full rounded-2xl bg-[#FACC15] text-[#121418] font-bold py-4 active:scale-[.98] transition">Translate <span class="opacity-50 text-xs font-semibold ml-1 hidden md:inline">Ctrl + Enter</span></button>
+    </div>
+    <div id="tr-out" class="mt-4"></div>
+  </section>
+
+  <!-- MAP -->
+  <section id="s-map" class="screen hidden absolute inset-0">
+    <div id="map" class="absolute inset-0"></div>
+    <div class="absolute top-0 inset-x-0 z-[1000] px-4 pt-[max(1rem,env(safe-area-inset-top))] pointer-events-none">
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <div id="map-chips" class="flex-1 flex gap-2 overflow-x-auto noscroll"></div>
+        <button class="js-settings shrink-0 w-10 h-10 rounded-full bg-[#1E2028]/95 border border-white/10 flex items-center justify-center" aria-label="Settings">
+          <svg width="18" height="18" fill="none" stroke="#FACC15" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FACTS -->
+  <section id="s-facts" class="screen hidden absolute inset-0 overflow-y-auto px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-28">
+    <div class="hdr"></div>
+    <select id="f-city" class="mt-2 w-full rounded-2xl bg-[#1E2028] pl-4 pr-10 py-4 font-semibold"></select>
+    <div id="f-list" class="mt-4 space-y-3"></div>
+  </section>
+
+  <!-- ITINERARY -->
+  <section id="s-plan" class="screen hidden absolute inset-0 overflow-y-auto px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-28">
+    <div class="hdr"></div>
+    <div class="rounded-3xl bg-[#1E2028] p-4 mt-2 space-y-4">
+      <label class="block text-xs text-white/50">Destination
+        <input id="p-dest" list="p-cities" value="Tokyo" class="mt-1 w-full rounded-2xl bg-[#262932] px-4 py-3 text-base text-white" placeholder="Paris, Tokyo, Istanbul, Rome…"></label>
+      <datalist id="p-cities"></datalist>
+      <label class="block text-xs text-white/50"><span class="flex justify-between">Duration <b id="p-days-v" class="text-[#FACC15] text-sm">3 days</b></span>
+        <input id="p-days" type="range" min="1" max="7" value="3" class="mt-2 w-full"></label>
+      <div>
+        <div class="text-xs text-white/50 mb-2">Travel style</div>
+        <div id="p-styles" class="grid grid-cols-4 gap-2"></div>
+      </div>
+      <button id="p-go" class="w-full rounded-2xl bg-[#FACC15] text-[#121418] font-bold py-4 active:scale-[.98] transition">Plan my trip</button>
+    </div>
+    <div id="p-out" class="mt-4 space-y-3"></div>
+  </section>
+
+  <!-- BOTTOM SHEET -->
+  <div id="sheet" class="absolute inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-[1500] translate-y-[160%] transition-transform duration-300 mx-3 rounded-3xl bg-[#1E2028] shadow-2xl border border-white/10 overflow-hidden"></div>
+
+  <!-- NAV -->
+  <nav id="nav" class="absolute bottom-0 inset-x-0 z-[2000] bg-[#181A20]/95 backdrop-blur border-t border-white/5 pb-[env(safe-area-inset-bottom)]">
+    <div class="grid grid-cols-4 px-2 py-2"></div>
+  </nav>
+
+  <!-- SETTINGS -->
+  <div id="modal" class="hidden absolute inset-0 z-[3000] bg-black/70 items-end">
+    <div class="w-full rounded-t-3xl bg-[#1E2028] p-6 pb-8">
+      <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold">Settings</h2><button id="m-x" class="text-white/50 text-2xl leading-none" aria-label="Close">×</button></div>
+      <label class="block text-xs text-white/50">AI provider
+        <select id="m-prov" class="mt-1 w-full rounded-2xl bg-[#262932] pl-4 pr-10 py-3 text-base text-white">
+          <option value="none">None (offline demo data)</option><option value="gemini">Google Gemini</option><option value="openai">OpenAI</option></select></label>
+      <label class="block text-xs text-white/50 mt-3">API key
+        <input id="m-key" type="password" autocomplete="off" placeholder="Paste your key" class="mt-1 w-full rounded-2xl bg-[#262932] px-4 py-3 text-base text-white"></label>
+      <p class="text-xs text-white/40 mt-3">The key stays in this browser and is sent only to the provider you pick. With a key, translation works for any text and trip planning works for any destination.</p>
+      <div class="flex gap-3 mt-5">
+        <button id="m-clear" class="flex-1 rounded-2xl bg-[#262932] py-3 font-semibold">Remove key</button>
+        <button id="m-save" class="flex-1 rounded-2xl bg-[#FACC15] text-[#121418] py-3 font-bold">Save</button></div>
+    </div>
+  </div>
+
+  <div id="toast" class="absolute top-4 left-1/2 -translate-x-1/2 z-[4000] hidden max-w-[88%] rounded-2xl bg-[#FACC15] text-[#121418] text-sm font-semibold px-4 py-2.5 shadow-lg text-center"></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const LANGS={en:['English','en-US'],es:['Spanish','es-ES'],fr:['French','fr-FR'],it:['Italian','it-IT'],ja:['Japanese','ja-JP'],tr:['Turkish','tr-TR'],ru:['Russian','ru-RU'],de:['German','de-DE']};
+const CODES=Object.keys(LANGS);
+// Offline phrasebook: order = en, es, fr, it, ja, tr, ru, de
+const PB=[
+['Hello','Hola','Bonjour','Ciao','こんにちは','Merhaba','Здравствуйте','Hallo'],
+['Thank you','Gracias','Merci','Grazie','ありがとうございます','Teşekkürler','Спасибо','Danke'],
+['Goodbye','Adiós','Au revoir','Arrivederci','さようなら','Hoşça kalın','До свидания','Auf Wiedersehen'],
+['Where is the bathroom?','¿Dónde está el baño?','Où sont les toilettes ?',"Dov'è il bagno?",'トイレはどこですか？','Tuvalet nerede?','Где туалет?','Wo ist die Toilette?'],
+['How much does this cost?','¿Cuánto cuesta esto?','Combien ça coûte ?','Quanto costa?','いくらですか？','Bu ne kadar?','Сколько это стоит?','Wie viel kostet das?'],
+['I need help','Necesito ayuda',"J'ai besoin d'aide",'Ho bisogno di aiuto','助けてください','Yardıma ihtiyacım var','Мне нужна помощь','Ich brauche Hilfe'],
+['A table for two, please','Una mesa para dos, por favor',"Une table pour deux, s'il vous plaît",'Un tavolo per due, per favore','二人です','İki kişilik masa lütfen','Столик на двоих, пожалуйста','Einen Tisch für zwei, bitte'],
+['The bill, please','La cuenta, por favor',"L'addition, s'il vous plaît",'Il conto, per favore','お会計をお願いします','Hesap lütfen','Счёт, пожалуйста','Die Rechnung, bitte'],
+['Do you speak English?','¿Habla inglés?','Parlez-vous anglais ?','Parla inglese?','英語は話せますか？','İngilizce biliyor musunuz?','Вы говорите по-английски?','Sprechen Sie Englisch?'],
+['This is delicious!','¡Está delicioso!',"C'est délicieux !",'È delizioso!','おいしいです！','Çok lezzetli!','Очень вкусно!','Das ist köstlich!'],
+['Where is the train station?','¿Dónde está la estación de tren?','Où est la gare ?',"Dov'è la stazione?",'駅はどこですか？','Tren istasyonu nerede?','Где вокзал?','Wo ist der Bahnhof?']
+];
+const CITIES={
+paris:{name:'Paris',c:[48.8566,2.3522],spots:[
+{n:'Eiffel Tower',p:[48.8584,2.2945],e:'🗼',t:['culture','adventure'],d:'The iron icon of Paris. Go at dusk, when the lights sparkle on the hour.'},
+{n:'Louvre Museum',p:[48.8606,2.3376],e:'🖼️',t:['culture'],d:'Home of the Mona Lisa. Enter through the Carrousel entrance for shorter lines.'},
+{n:'Montmartre & Sacré-Cœur',p:[48.8867,2.3431],e:'⛪',t:['culture','budget'],d:'Hilltop village feel, street painters and a free view over the city.'},
+{n:'Le Marais food walk',p:[48.8575,2.3622],e:'🥙',t:['food','budget'],d:'Falafel, bakeries and cheese shops along narrow medieval streets.'},
+{n:'Pont des Arts picnic',p:[48.8583,2.3375],e:'🧺',t:['budget','food'],d:'Grab bread and cheese, then sit above the Seine for sunset.'},
+{n:'Paris Catacombs',p:[48.8338,2.3324],e:'💀',t:['adventure'],d:'Walk through tunnels lined with bones. Book a timed ticket ahead.'}],
+facts:[
+{k:'Local secret',t:'Covered passages',x:'Passage des Panoramas, open since 1799, hides old cafés and stamp shops away from the crowds.'},
+{k:'History',t:'A temporary tower',x:'The Eiffel Tower was built for the 1889 World’s Fair and was meant to come down after 20 years.'},
+{k:'Etiquette',t:'Say bonjour first',x:'Greet shopkeepers with “Bonjour” before asking for anything. Skipping it comes across as rude.'},
+{k:'Fun fact',t:'Paris has a Lady Liberty',x:'A small replica of the Statue of Liberty stands on the Île aux Cygnes in the Seine.'}]},
+tokyo:{name:'Tokyo',c:[35.6762,139.6503],spots:[
+{n:'Senso-ji Temple',p:[35.7148,139.7967],e:'⛩️',t:['culture','budget'],d:'Tokyo’s oldest temple. Walk Nakamise street for snacks on the way in.'},
+{n:'Shibuya Crossing',p:[35.6595,139.7005],e:'🚦',t:['culture','adventure'],d:'The famous scramble. Watch from the Starbucks window or Shibuya Sky.'},
+{n:'Meiji Shrine',p:[35.6764,139.6993],e:'🌲',t:['culture','budget'],d:'A calm forest path in the middle of the city, free to enter.'},
+{n:'Tsukiji Outer Market',p:[35.6655,139.7707],e:'🍣',t:['food'],d:'Fresh sushi, tamagoyaki and street food. Arrive before 10:00.'},
+{n:'Golden Gai',p:[35.694,139.7036],e:'🍶',t:['food','adventure'],d:'Alleys of tiny bars with a handful of seats each.'},
+{n:'Mount Takao',p:[35.6252,139.2437],e:'🥾',t:['adventure','budget'],d:'An easy day hike less than an hour from Shinjuku by train.'}],
+facts:[
+{k:'Local secret',t:'Tiny bars, small covers',x:'Many Golden Gai bars seat fewer than ten people and some add a cover charge. Check the sign by the door.'},
+{k:'History',t:'From Edo to Tokyo',x:'The city was called Edo until 1868, when it was renamed Tokyo and became the imperial capital.'},
+{k:'Etiquette',t:'No tipping, no walking and eating',x:'Tipping isn’t expected. Finish snacks near the shop or a vending machine instead of eating on the move.'},
+{k:'Fun fact',t:'The busiest crossing',x:'At Shibuya Crossing, well over a thousand people can cross on a single green light.'}]},
+istanbul:{name:'Istanbul',c:[41.0082,28.9784],spots:[
+{n:'Hagia Sophia',p:[41.0086,28.9802],e:'🕌',t:['culture'],d:'A 6th-century marvel of Byzantine engineering. Arrive early to avoid queues.'},
+{n:'Grand Bazaar',p:[41.0107,28.968],e:'🧿',t:['culture','food','budget'],d:'Over 4,000 shops. Bargain politely and drink the tea you’re offered.'},
+{n:'Galata Tower',p:[41.0256,28.9744],e:'🗼',t:['culture','adventure'],d:'Panoramic views of the Golden Horn. Best at golden hour.'},
+{n:'Basilica Cistern',p:[41.0084,28.9779],e:'🏛️',t:['culture','adventure'],d:'An underground Roman reservoir with 336 columns.'},
+{n:'Eminönü ferry',p:[41.0178,28.9706],e:'⛴️',t:['budget','adventure'],d:'A cheap public ferry across the Bosphorus. Buy a simit on deck.'},
+{n:'Balat streets',p:[41.0294,28.9486],e:'🎨',t:['food','budget'],d:'Colorful houses, vintage shops and relaxed cafés.'}],
+facts:[
+{k:'Local secret',t:'Take the ferry',x:'Public ferries from Eminönü and Karaköy give Bosphorus views for the price of a transit fare.'},
+{k:'History',t:'Four lives of a landmark',x:'Hagia Sophia was a cathedral from 537, a mosque from 1453, a museum from 1934 and a mosque again since 2020.'},
+{k:'Etiquette',t:'Dress for mosques',x:'Cover shoulders and knees, bring a scarf if you’re visiting as a woman, and remove shoes before stepping on the carpet.'},
+{k:'Fun fact',t:'Two continents',x:'Istanbul sits on both Europe and Asia, split by the Bosphorus strait.'}]},
+rome:{name:'Rome',c:[41.9028,12.4964],spots:[
+{n:'Colosseum',p:[41.8902,12.4922],e:'🏟️',t:['culture','adventure'],d:'Opened in AD 80. Book a combined ticket with the Forum.'},
+{n:'Pantheon',p:[41.8986,12.4769],e:'🏛️',t:['culture','budget'],d:'Nearly 2,000 years old, with a dome that still holds the record for unreinforced concrete.'},
+{n:'Trastevere',p:[41.8896,12.4698],e:'🍝',t:['food','budget'],d:'Cobbled lanes and trattorias. Best for an evening stroll and dinner.'},
+{n:'Vatican Museums',p:[41.9065,12.4536],e:'🎨',t:['culture'],d:'Ends in the Sistine Chapel. Pre-book the first entry slot.'},
+{n:'Appian Way',p:[41.8559,12.513],e:'🚲',t:['adventure','budget'],d:'Rent a bike and ride the ancient Roman road past catacombs and tombs.'},
+{n:'Testaccio Market',p:[41.8764,12.4756],e:'🥪',t:['food','budget'],d:'Local lunch spot famous for supplì and trapizzino.'}],
+facts:[
+{k:'Local secret',t:'The keyhole view',x:'Look through the keyhole of the Knights of Malta door on the Aventine to see St Peter’s dome perfectly framed.'},
+{k:'History',t:'A 50,000-seat arena',x:'The Colosseum opened in AD 80 and could hold around 50,000 spectators.'},
+{k:'Etiquette',t:'Cappuccino before noon',x:'Romans rarely order milky coffee after a meal. Standing at the bar is also cheaper than sitting.'},
+{k:'Fun fact',t:'Coins for charity',x:'Coins tossed into the Trevi Fountain are collected regularly and donated to charity.'}]}
+};
+const STYLES=[['budget','Budget','💸'],['adventure','Adventure','🧗'],['culture','Culture','🏛️'],['food','Food','🍜']];
+const SVG={
+ translate:'<path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/>',
+ map:'<path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+ facts:'<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.7.6 1 1.4 1 2.3h6c0-.9.3-1.7 1-2.3A7 7 0 0 0 12 2z"/>',
+ plan:'<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/>'
+};
+const TABS=[['translate','Translate'],['map','Map'],['facts','Facts'],['plan','Itinerary']];
+const ico=k=>`<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">${SVG[k]}</svg>`;
+
+let cfg={prov:'none',key:''};
+try{cfg=Object.assign(cfg,JSON.parse(localStorage.getItem('nomadai-cfg')||'{}'))}catch(e){}
+const state={city:'paris',route:null,sheet:null};
+const norm=s=>s.toLowerCase().replace(/[.,!?¿¡。？！、'’"]/g,'').replace(/\s+/g,' ').trim();
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let toastT;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.add('hidden'),2800)}
+const gear='<button class="js-settings w-10 h-10 rounded-full bg-[#1E2028] flex items-center justify-center" aria-label="Settings"><svg width="18" height="18" fill="none" stroke="#FACC15" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>';
+const TITLES={translate:['Translate','Say it like a local'],facts:['Local guide','Secrets, history and manners'],plan:['Itinerary','Plan a trip day by day']};
+$$('.hdr').forEach(h=>{const k=h.parentElement.id.slice(2),[t,s]=TITLES[k];h.className='hdr flex items-center justify-between';h.innerHTML=`<div><div class="text-[11px] font-bold text-[#FACC15]">NomadAI</div><h1 class="text-2xl font-extrabold leading-tight">${t}</h1><p class="text-sm text-white/45">${s}</p></div>${gear}`});
+
+// ---------- Navigation ----------
+$('#nav div').innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] font-semibold transition">${ico(k)}${l}</button>`).join('');
+function go(t){
+  $$('.screen').forEach(s=>s.classList.toggle('hidden',s.id!=='s-'+t));
+  $$('#nav button').forEach(b=>{const a=b.dataset.t===t;b.className='flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] font-semibold transition '+(a?'bg-[#FACC15] text-[#121418]':'text-white/50')});
+  closeSheet();
+  if(t==='map'){initMap();setTimeout(()=>{map.invalidateSize();fitMap()},60)}
+}
+$$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+
+// ---------- AI helper ----------
+let gModels=null;
+async function geminiModels(){
+  if(gModels)return gModels;
+  const fb=['gemini-flash-latest','gemini-flash-lite-latest','gemini-2.5-flash','gemini-2.5-flash-lite'];
+  try{
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key='+encodeURIComponent(cfg.key));
+    const j=await r.json();
+    const l=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')&&/flash/.test(m.name)&&!/image|tts|live|audio|thinking|exp|vision/.test(m.name)).map(m=>m.name.replace('models/',''));
+    l.sort((a,b)=>(/latest/.test(b)-/latest/.test(a))||b.localeCompare(a));
+    gModels=l.length?l.slice(0,5):fb;
+  }catch(e){gModels=fb}
+  return gModels;
+}
+async function llm(prompt,json){
+  if(!cfg.key||cfg.prov==='none')return null;
+  if(cfg.prov==='gemini'){
+    let last='';
+    for(const m of await geminiModels()){
+      const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent?key='+encodeURIComponent(cfg.key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:json?{responseMimeType:'application/json'}:{}})});
+      if(r.ok)return (await r.json()).candidates[0].content.parts[0].text;
+      let msg='';try{msg=(await r.json()).error.message}catch(e){}
+      last='Gemini '+r.status+(msg?': '+msg.slice(0,90):'');
+      if(![404,429,500,503].includes(r.status))break;
+    }
+    throw new Error(last);
+  }
+  const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+cfg.key},body:JSON.stringify(Object.assign({model:'gpt-4o-mini',messages:[{role:'user',content:prompt}]},json?{response_format:{type:'json_object'}}:{}))});
+  if(!r.ok)throw new Error('OpenAI error '+r.status);
+  return (await r.json()).choices[0].message.content;
+}
+
+// ---------- Translator ----------
+const opts=CODES.map(c=>`<option value="${c}">${LANGS[c][0]}</option>`).join('');
+$('#tr-from').innerHTML=opts;$('#tr-to').innerHTML=opts;$('#tr-from').value='en';$('#tr-to').value='ja';
+$('#tr-chips').innerHTML=['Hello','Thank you','Where is the bathroom?','The bill, please'].map(p=>`<button class="shrink-0 rounded-full bg-[#262932] px-3 py-2 text-xs font-semibold text-white/80">${p}</button>`).join('');
+$$('#tr-chips button').forEach(b=>b.onclick=()=>{$('#tr-from').value='en';$('#tr-in').value=b.textContent;translate()});
+$('#tr-swap').onclick=()=>{const f=$('#tr-from'),t=$('#tr-to'),o=$('#tr-out').dataset.text;[f.value,t.value]=[t.value,f.value];if(o)$('#tr-in').value=o;$('#tr-out').innerHTML='';$('#tr-out').dataset.text=''};
+function mockTranslate(text,from,to){
+  const i=CODES.indexOf(from),j=CODES.indexOf(to),n=norm(text);
+  const row=PB.find(r=>norm(r[i])===n);
+  return row?row[j]:null;
+}
+async function translate(){
+  const text=$('#tr-in').value.trim(),from=$('#tr-from').value,to=$('#tr-to').value,out=$('#tr-out');
+  if(!text){toast('Type something to translate');return}
+  if(from===to){show(text,'Same language');return}
+  const btn=$('#tr-go');btn.disabled=true;btn.firstChild.textContent='Translating… ';
+  let res=null,tag='Offline demo';
+  try{
+    const r=await llm(`Translate from ${LANGS[from][0]} to ${LANGS[to][0]}. Reply with the translation only, no notes.\n\n${text}`);
+    if(r){res=r.trim();tag=cfg.prov==='gemini'?'Gemini':'OpenAI'}
+  }catch(e){toast(e.message+'. Using demo data.')}
+  if(!res)res=mockTranslate(text,from,to);
+  btn.disabled=false;btn.firstChild.textContent='Translate ';
+  if(!res){out.dataset.text='';out.innerHTML=`<div class="rounded-3xl bg-[#1E2028] p-5 text-sm text-white/70">Demo mode only knows ${PB.length} travel phrases, such as “Hello” or “The bill, please”. Add an API key in Settings to translate anything.</div>`;return}
+  show(res,tag);
+  function show(r,tg){
+    out.dataset.text=r;
+    out.innerHTML=`<div class="rounded-3xl bg-[#1E2028] p-5 border border-[#FACC15]/30"><div class="flex justify-between text-xs text-white/45"><span>${LANGS[to][0]}</span><span class="rounded-full bg-[#262932] px-2 py-0.5">${tg}</span></div>
+    <p class="text-2xl font-bold mt-2 leading-snug">${esc(r)}</p>
+    <div class="flex gap-2 mt-4"><button id="tr-say" class="flex-1 rounded-2xl bg-[#FACC15] text-[#121418] font-bold py-3 flex items-center justify-center gap-2"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>Speak</button>
+    <button id="tr-copy" class="rounded-2xl bg-[#262932] font-semibold px-5 py-3">Copy</button></div></div>`;
+    $('#tr-say').onclick=()=>speak(r,to);
+    $('#tr-copy').onclick=()=>navigator.clipboard.writeText(r).then(()=>toast('Copied'),()=>toast('Copy not available'));
+  }
+}
+function speak(txt,lang){
+  if(!('speechSynthesis' in window)){toast('Speech is not supported in this browser');return}
+  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt);u.lang=LANGS[lang][1];u.rate=.95;speechSynthesis.speak(u);
+}
+$('#tr-go').onclick=translate;
+
+// ---------- Map ----------
+let map,layer;
+const hue=s=>[...s].reduce((a,c)=>a+c.charCodeAt(0),0)%360;
+const icon=(l,on)=>L.divIcon({className:'',html:`<div class="pin ${on?'on':''}">${l}</div>`,iconSize:[36,36],iconAnchor:[18,18]});
+function initMap(){
+  if(map)return;
+  map=L.map('map',{zoomControl:false}).setView(CITIES[state.city].c,12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+  layer=L.layerGroup().addTo(map);
+  map.on('click',closeSheet);
+  drawMap();
+}
+function chips(){
+  const c=Object.entries(CITIES).map(([k,v])=>`<button data-c="${k}" class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold border ${!state.route&&state.city===k?'bg-[#FACC15] text-[#121418] border-[#FACC15]':'bg-[#1E2028]/95 text-white/80 border-white/10'}">${v.name}</button>`).join('');
+  const r=state.route?`<button data-clear class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold bg-[#FACC15] text-[#121418]">✕ ${esc(state.route.city)} route</button>`:'';
+  $('#map-chips').innerHTML=r+c;
+  $$('#map-chips [data-c]').forEach(b=>b.onclick=()=>{state.city=b.dataset.c;state.route=null;drawMap();fitMap();closeSheet()});
+  const x=$('#map-chips [data-clear]');if(x)x.onclick=()=>{state.route=null;drawMap();fitMap()};
+}
+function drawMap(){
+  if(!map)return;
+  layer.clearLayers();
+  if(state.route){
+    const pts=[];let n=0;
+    state.route.days.forEach((d,di)=>d.stops.forEach(s=>{
+      n++;pts.push(s.p);
+      L.marker(s.p,{icon:icon(n,true)}).addTo(layer).on('click',()=>openSheet(s,`Day ${di+1} · ${s.time||''}`));
+    }));
+    L.polyline(pts,{color:'#FACC15',weight:3,dashArray:'6 8',opacity:.8}).addTo(layer);
+  }else{
+    CITIES[state.city].spots.forEach(s=>L.marker(s.p,{icon:icon(s.e,false)}).addTo(layer).on('click',()=>openSheet(s,CITIES[state.city].name)));
+  }
+  chips();
+}
+function fitMap(){
+  if(!map)return;
+  const pts=state.route?state.route.days.flatMap(d=>d.stops.map(s=>s.p)):CITIES[state.city].spots.map(s=>s.p);
+  map.fitBounds(L.latLngBounds(pts).pad(.25),{animate:true,maxZoom:15});
+}
+function openSheet(s,sub){
+  const h=hue(s.n),tags=(s.t||[]).map(t=>`<span class="rounded-full bg-[#262932] px-2.5 py-1 text-xs text-white/70">${t}</span>`).join('');
+  $('#sheet').innerHTML=`<div class="h-28 flex items-center justify-center text-6xl" style="background:linear-gradient(135deg,hsl(${h} 55% 28%),hsl(${(h+50)%360} 60% 12%))">${s.e||'📍'}</div>
+  <div class="p-5"><div class="text-xs text-[#FACC15] font-bold">${esc(sub)}</div><h3 class="text-xl font-extrabold mt-1">${esc(s.n)}</h3>
+  <p class="text-sm text-white/65 mt-2 leading-relaxed">${esc(s.d||'')}</p><div class="flex gap-2 mt-3 flex-wrap">${tags}</div>
+  <div class="flex gap-2 mt-4"><a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${s.p[0]},${s.p[1]}" class="flex-1 text-center rounded-2xl bg-[#FACC15] text-[#121418] font-bold py-3">Directions</a>
+  <button id="sh-x" class="rounded-2xl bg-[#262932] px-5 font-semibold">Close</button></div></div>`;
+  $('#sheet').classList.remove('translate-y-[160%]');
+  $('#sh-x').onclick=closeSheet;
+  map.panTo(s.p,{animate:true});
+}
+function closeSheet(){$('#sheet').classList.add('translate-y-[160%]')}
+
+// ---------- Facts ----------
+$('#f-city').innerHTML=Object.entries(CITIES).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('');
+const KIND={'Local secret':'bg-[#FACC15] text-[#121418]','History':'bg-sky-400/20 text-sky-300','Etiquette':'bg-emerald-400/20 text-emerald-300','Fun fact':'bg-fuchsia-400/20 text-fuchsia-300'};
+function renderFacts(){
+  const c=CITIES[$('#f-city').value];
+  $('#f-list').innerHTML=c.facts.map(f=>`<article class="rounded-3xl bg-[#1E2028] p-5"><span class="inline-block rounded-full px-3 py-1 text-xs font-bold ${KIND[f.k]}">${f.k}</span>
+  <h3 class="text-lg font-bold mt-3">${f.t}</h3><p class="text-sm text-white/65 mt-1 leading-relaxed">${f.x}</p></article>`).join('');
+}
+$('#f-city').onchange=renderFacts;
+
+// ---------- Itinerary ----------
+let style='culture';
+$('#p-styles').innerHTML=STYLES.map(([k,l,e])=>`<button data-s="${k}" class="rounded-2xl py-3 text-xs font-semibold flex flex-col items-center gap-1"><span class="text-xl">${e}</span>${l}</button>`).join('');
+function paintStyles(){$$('#p-styles button').forEach(b=>b.className='rounded-2xl py-3 text-xs font-semibold flex flex-col items-center gap-1 '+(b.dataset.s===style?'bg-[#FACC15] text-[#121418]':'bg-[#262932] text-white/70'))}
+$$('#p-styles button').forEach(b=>b.onclick=()=>{style=b.dataset.s;paintStyles()});paintStyles();
+$('#p-cities').innerHTML=Object.values(CITIES).map(c=>`<option value="${c.name}">`).join('');
+$('#p-days').oninput=e=>$('#p-days-v').textContent=e.target.value+(e.target.value==='1'?' day':' days');
+function mockTrip(key,days,st){
+  const c=CITIES[key],times=['09:30','13:00','17:30'];
+  const pool=[...c.spots].sort((a,b)=>b.t.includes(st)-a.t.includes(st));
+  const per=Math.min(3,Math.max(2,Math.ceil(pool.length/days)));
+  return {city:c.name,key,days:Array.from({length:days},(_,i)=>{
+    const stops=Array.from({length:per},(_,j)=>Object.assign({},pool[(i*per+j)%pool.length],{time:times[j]}));
+    return {title:stops[0].n+' & nearby',stops}})};
+}
+async function aiTrip(dest,days,st){
+  const r=await llm(`Create a ${days}-day ${st} travel itinerary for ${dest}. Reply with JSON only: {"days":[{"title":"short title","stops":[{"n":"place name","lat":0,"lng":0,"d":"one sentence tip","time":"09:30"}]}]} with 3 stops per day and real coordinates.`,true);
+  if(!r)return null;
+  const j=JSON.parse(r.replace(/```json|```/g,'').trim());
+  return {city:dest,key:null,days:j.days.map(d=>({title:d.title,stops:d.stops.map(s=>({n:s.n,p:[+s.lat,+s.lng],e:'📍',d:s.d,time:s.time,t:[st]}))}))};
+}
+async function plan(){
+  const dest=$('#p-dest').value.trim(),days=+$('#p-days').value;
+  if(!dest){toast('Enter a destination');return}
+  const key=Object.keys(CITIES).find(k=>dest.toLowerCase().includes(k));
+  const btn=$('#p-go');btn.disabled=true;btn.textContent='Planning…';
+  let trip=null;
+  try{trip=await aiTrip(dest,days,style)}catch(e){toast('AI planning failed. '+(key?'Using demo data.':e.message))}
+  if(!trip&&key)trip=mockTrip(key,days,style);
+  btn.disabled=false;btn.textContent='Plan my trip';
+  if(!trip){toast('Demo covers Paris, Tokyo, Istanbul and Rome. Add an API key for other places.');return}
+  state.route=trip;if(trip.key)state.city=trip.key;
+  drawMap();renderTrip();
+  toast('Route added to the map');
+}
+function renderTrip(){
+  const t=state.route;if(!t)return;
+  let n=0;
+  $('#p-out').innerHTML=`<button id="p-map" class="w-full rounded-2xl bg-[#262932] border border-[#FACC15]/40 text-[#FACC15] font-bold py-3">View route on map</button>`+
+  t.days.map((d,di)=>`<div class="rounded-3xl bg-[#1E2028] p-5"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-[#FACC15] text-[#121418] font-extrabold flex items-center justify-center text-sm">${di+1}</div><div><div class="text-xs text-white/45">Day ${di+1}</div><h3 class="font-bold leading-tight">${esc(d.title)}</h3></div></div>
+  <div class="mt-3 space-y-1">${d.stops.map((s,si)=>{n++;return `<button data-d="${di}" data-s="${si}" class="w-full text-left flex gap-3 rounded-2xl p-3 hover:bg-white/5 active:bg-white/10"><span class="text-xs text-white/40 w-11 pt-0.5">${esc(s.time||'')}</span><span class="flex-1"><b class="text-sm block">${s.e||'📍'} ${esc(s.n)}</b><span class="text-xs text-white/55">${esc(s.d||'')}</span></span><span class="text-[#FACC15] text-xs font-bold">#${n}</span></button>`}).join('')}</div></div>`).join('');
+  $('#p-map').onclick=()=>go('map');
+  $$('#p-out [data-d]').forEach(b=>b.onclick=()=>{const di=+b.dataset.d,s=t.days[di].stops[+b.dataset.s];go('map');setTimeout(()=>{map.setView(s.p,15);openSheet(s,`Day ${di+1} · ${s.time||''}`)},120)});
+}
+$('#p-go').onclick=plan;
+
+// ---------- Settings ----------
+function openModal(){$('#m-prov').value=cfg.prov;$('#m-key').value=cfg.key;$('#modal').classList.remove('hidden');$('#modal').classList.add('flex')}
+function closeModal(){$('#modal').classList.add('hidden');$('#modal').classList.remove('flex')}
+function saveCfg(){try{localStorage.setItem('nomadai-cfg',JSON.stringify(cfg))}catch(e){}}
+document.addEventListener('click',e=>{if(e.target.closest('.js-settings'))openModal()});
+$('#m-x').onclick=closeModal;
+$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
+$('#m-save').onclick=()=>{cfg={prov:$('#m-prov').value,key:$('#m-key').value.trim()};if(!cfg.key)cfg.prov='none';saveCfg();closeModal();toast(cfg.prov==='none'?'Using offline demo data':'AI provider saved')};
+$('#m-clear').onclick=()=>{cfg={prov:'none',key:''};saveCfg();closeModal();toast('Key removed')};
+
+// ---------- Key bindings ----------
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeModal();closeSheet()}
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){
+    if(!$('#s-translate').classList.contains('hidden'))translate();
+    else if(!$('#s-plan').classList.contains('hidden'))plan();
+  }
+});
+
+renderFacts();go('translate');
+</script>
+</body>
+</html>
